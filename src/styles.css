@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader", ui-serif, Georgia, serif;
+  --color-bg: #101311;
+  --color-bg-top: #171c19;
+  --color-surface: #1b211d;
+  --color-surface-2: #242b26;
+  --color-fg: #e8efe9;
+  --color-muted: #93a096;
+  --color-border: #313a34;
+  --color-brass: #d7a35a;
+  --color-brass-ink: #1a140c;
+  --color-up: #3cba78;
+  --color-down: #e36a5d;
+  --color-up-dim: #163226;
+  --color-down-dim: #3a1f1c;
+  --radius-lg: 0.85rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--color-bg-top), var(--color-bg) 22rem);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brass);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-brass);
+    color: var(--color-brass-ink);
+  }
+}
+
+@keyframes oree-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.oree-pulse {
+  animation: oree-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oree-pulse {
+    animation: none;
+  }
+}
