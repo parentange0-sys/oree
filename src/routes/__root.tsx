@@ -11,14 +11,14 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
       {
         name: "description",
         content:
           "Veille des paires USDT Binance : cours réels, actus et réseaux, stop loss et gain d’arrêt.",
       },
-      { name: "theme-color", content: "#101311" },
+      { name: "theme-color", content: "#0e1210" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

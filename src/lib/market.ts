@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { baseOf, decodeEntities, finiteNumber, mapRows, readTicker } from "@/lib/market-parse";
 
 export type Bias = "hausse" | "baisse" | "range";
 
@@ -90,6 +91,7 @@ const NAMES: Record<string, string> = {
   BNB: "BNB",
   SOL: "Solana",
   XRP: "XRP",
+  ZEC: "Zcash",
   DOGE: "Dogecoin",
   ADA: "Cardano",
   AVAX: "Avalanche",
@@ -157,24 +159,10 @@ function assertSymbol(symbol: string): string {
   return s;
 }
 
-function baseOf(symbol: string): string {
-  return symbol.slice(0, -4);
-}
-
-function isLeveraged(base: string): boolean {
-  return base.length >= 5 && /(UP|DOWN|BULL|BEAR)$/.test(base);
-}
-
-function num(value: unknown): number {
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function biasOf(change: number, pos: number): Bias {
-  if ((change >= 2 && pos >= 0.62) || change >= 4) return "hausse";
-  if ((change <= -2 && pos <= 0.38) || change <= -4) return "baisse";
-  return "range";
-}
+const FRESH_MARKET_MS = 12_000;
+const FRESH_QUOTE_MS = 3_000;
+const FRESH_DETAIL_MS = 30_000;
+const KEPT_MS = 5 * 60_000;
 
 async function binance(path: string, ms: number): Promise<unknown> {
   let last = "Binance est injoignable pour le moment.";
@@ -218,24 +206,6 @@ async function getText(url: string, ms: number): Promise<string> {
   });
   if (!res.ok) throw new Error(String(res.status));
   return res.text();
-}
-
-function decodeEntities(raw: string): string {
-  return raw
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, '"')
-    .replace(/&#0?39;|'/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n: string) => {
-      const code = Number(n);
-      return code > 0 && code < 65536 ? String.fromCodePoint(code) : "";
-    })
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function tagText(block: string, tag: string): string {
@@ -307,47 +277,13 @@ function rsi(closes: number[], period = 14): number | null {
   return 100 - 100 / (1 + rs);
 }
 
-function mapRows(payload: unknown): MarketRow[] {
-  if (!Array.isArray(payload)) throw new Error("Réponse Binance inattendue.");
-  const rows: MarketRow[] = [];
-  for (const item of payload) {
-    if (!item || typeof item !== "object") continue;
-    const raw = item as Record<string, unknown>;
-    const symbol = typeof raw.symbol === "string" ? raw.symbol : "";
-    if (!symbol.endsWith("USDT")) continue;
-    const base = baseOf(symbol);
-    if (!/^[A-Z0-9]{1,16}$/.test(base) || isLeveraged(base)) continue;
-    const price = num(raw.lastPrice);
-    const high = num(raw.highPrice);
-    const low = num(raw.lowPrice);
-    const changePct = num(raw.priceChangePercent);
-    const quoteVolume = num(raw.quoteVolume);
-    if (!(price > 0) || !Number.isFinite(changePct)) continue;
-    const span = high - low;
-    const rangePos = span > 0 ? Math.min(1, Math.max(0, (price - low) / span)) : 0.5;
-    rows.push({
-      symbol,
-      base,
-      price,
-      changePct,
-      high: Number.isFinite(high) ? high : price,
-      low: Number.isFinite(low) ? low : price,
-      quoteVolume: Number.isFinite(quoteVolume) ? quoteVolume : 0,
-      rangePos,
-      bias: biasOf(changePct, rangePos),
-    });
-  }
-  rows.sort((a, b) => b.quoteVolume - a.quoteVolume);
-  return rows;
-}
-
 async function loadFear(): Promise<FearGreed | null> {
   try {
     const payload = (await getJson("https://api.alternative.me/fng/?limit=1", 8000)) as {
       data?: { value?: string; value_classification?: string }[];
     };
     const row = payload.data?.[0];
-    const value = num(row?.value);
+    const value = finiteNumber(row?.value);
     if (!Number.isFinite(value)) return null;
     const label = FNG_FR[row?.value_classification ?? ""] ?? row?.value_classification ?? "Indice";
     return { value, label };
@@ -380,66 +316,58 @@ async function loadTrending(bases: Set<string>): Promise<Trend[]> {
 }
 
 async function loadMarket(): Promise<MarketOk> {
-  const cached = fromCache<MarketOk>("market", 12_000);
+  const cached = fromCache<MarketOk>("market", FRESH_MARKET_MS);
   if (cached) return cached;
-  const [ticker, fng] = await Promise.all([binance("/api/v3/ticker/24hr", 15_000), loadFear()]);
-  const rows = mapRows(ticker);
-  if (rows.length === 0) throw new Error("Aucune paire USDT reçue de Binance.");
-  const bases = new Set(rows.map((row) => row.base));
-  const trending = await loadTrending(bases);
-  const value: MarketOk = { ok: true, updatedAt: Date.now(), rows, fng, trending };
-  putCache("market", value);
-  return value;
-}
-
-function readTicker(payload: unknown, symbol: string): Quote {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return { ok: false, error: "Cours indisponible." };
+  try {
+    const [ticker, fng] = await Promise.all([binance("/api/v3/ticker/24hr", 15_000), loadFear()]);
+    const rows = mapRows(ticker);
+    if (rows.length === 0) throw new Error("Aucune paire USDT reçue de Binance.");
+    const bases = new Set(rows.map((row) => row.base));
+    const trending = await loadTrending(bases);
+    const value: MarketOk = { ok: true, updatedAt: Date.now(), rows, fng, trending };
+    putCache("market", value);
+    return value;
+  } catch (error) {
+    const stale = fromCache<MarketOk>("market", KEPT_MS);
+    if (stale) return stale;
+    throw error;
   }
-  const raw = payload as Record<string, unknown>;
-  if (typeof raw.code === "number") {
-    return { ok: false, error: "Cette paire n’est pas cotée en spot USDT sur Binance." };
-  }
-  const price = num(raw.lastPrice);
-  if (!(price > 0)) return { ok: false, error: "Cours indisponible." };
-  const bid = num(raw.bidPrice);
-  const ask = num(raw.askPrice);
-  return {
-    ok: true,
-    symbol,
-    price,
-    changePct: num(raw.priceChangePercent) || 0,
-    high: num(raw.highPrice) || price,
-    low: num(raw.lowPrice) || price,
-    open: num(raw.openPrice) || price,
-    quoteVolume: num(raw.quoteVolume) || 0,
-    bid: Number.isFinite(bid) ? bid : price,
-    ask: Number.isFinite(ask) ? ask : price,
-    at: Date.now(),
-  };
 }
 
 async function loadQuote(symbol: string): Promise<Quote> {
   const key = `quote:${symbol}`;
-  const cached = fromCache<Quote>(key, 3_000);
-  if (cached) return cached;
-  const payload = await binance(`/api/v3/ticker/24hr?symbol=${symbol}`, 8_000);
-  const quote = readTicker(payload, symbol);
-  if (quote.ok) putCache(key, quote);
-  return quote;
+  const cached = fromCache<Quote>(key, FRESH_QUOTE_MS);
+  if (cached?.ok) return cached;
+  try {
+    const payload = await binance(`/api/v3/ticker/24hr?symbol=${symbol}`, 8_000);
+    const quote = readTicker(payload, symbol);
+    if (quote.ok) putCache(key, quote);
+    return quote;
+  } catch (error) {
+    const stale = fromCache<Quote>(key, KEPT_MS);
+    if (stale?.ok) return stale;
+    throw error;
+  }
 }
 
 async function loadDetail(symbol: string): Promise<Detail> {
   const key = `detail:${symbol}`;
-  const cached = fromCache<Detail>(key, 30_000);
-  if (cached) return cached;
-  const payload = await binance(`/api/v3/klines?symbol=${symbol}&interval=1h&limit=80`, 8_000);
+  const cached = fromCache<Detail>(key, FRESH_DETAIL_MS);
+  if (cached?.ok) return cached;
+  let payload: unknown;
+  try {
+    payload = await binance(`/api/v3/klines?symbol=${symbol}&interval=1h&limit=80`, 8_000);
+  } catch (error) {
+    const stale = fromCache<Detail>(key, KEPT_MS);
+    if (stale?.ok) return stale;
+    throw error;
+  }
   if (!Array.isArray(payload)) return { ok: false, error: "Graphique indisponible." };
   const candles: Candle[] = [];
   for (const row of payload) {
     if (!Array.isArray(row)) continue;
-    const t = num(row[0]);
-    const c = num(row[4]);
+    const t = finiteNumber(row[0]);
+    const c = finiteNumber(row[4]);
     if (Number.isFinite(t) && c > 0) candles.push({ t, c });
   }
   if (candles.length < 2) return { ok: false, error: "Pas assez de chandeliers." };
@@ -592,7 +520,9 @@ async function loadIntel(symbol: string): Promise<Intel> {
     }),
   ]);
   if (stock.missing) notes.push(`Pas de fil Stocktwits public pour ${base}.`);
-  const keys = [base.toLowerCase(), name?.toLowerCase()].filter((item): item is string => Boolean(item));
+  const keys = [base.toLowerCase(), name?.toLowerCase()].filter((item): item is string =>
+    Boolean(item),
+  );
   const related = general.filter((article) =>
     keys.some((needle) => article.title.toLowerCase().includes(needle)),
   );
@@ -600,9 +530,7 @@ async function loadIntel(symbol: string): Promise<Intel> {
     ok: true,
     symbol,
     articles: dedupeArticles([...google, ...related]),
-    social: [...bluesky, ...stock.posts]
-      .sort((a, b) => b.publishedAt - a.publishedAt)
-      .slice(0, 12),
+    social: [...bluesky, ...stock.posts].sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 12),
     marketNews: general.slice(0, 10),
     notes,
     updatedAt: Date.now(),
@@ -611,16 +539,18 @@ async function loadIntel(symbol: string): Promise<Intel> {
   return intel;
 }
 
-export const getMarket = createServerFn({ method: "GET" }).handler(async (): Promise<MarketResult> => {
-  try {
-    return await loadMarket();
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Impossible de lire Binance.",
-    };
-  }
-});
+export const getMarket = createServerFn({ method: "GET" }).handler(
+  async (): Promise<MarketResult> => {
+    try {
+      return await loadMarket();
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Impossible de lire Binance.",
+      };
+    }
+  },
+);
 
 const symbolValidator = (data: { symbol: string }) => {
   if (!data || typeof data.symbol !== "string") throw new Error("Paire manquante");

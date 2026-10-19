@@ -46,7 +46,8 @@ export function Screener({
     const copy = [...next];
     if (sort === "hausse") copy.sort((a, b) => b.changePct - a.changePct);
     else if (sort === "baisse") copy.sort((a, b) => a.changePct - b.changePct);
-    else if (sort === "mouvement") copy.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+    else if (sort === "mouvement")
+      copy.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
     else copy.sort((a, b) => b.quoteVolume - a.quoteVolume);
     return copy;
   }, [rows, query, sort, watched]);
@@ -58,13 +59,16 @@ export function Screener({
       <div className="flex flex-col gap-3 border-b border-border p-4">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 className="font-serif text-2xl text-fg">Marché spot</h2>
+            <h2 className="text-lg font-medium text-fg">Marché spot</h2>
             <p className="text-sm text-muted">{shown.length} paires USDT</p>
           </div>
         </div>
         <label className="relative block">
           <span className="sr-only">Chercher une crypto</span>
-          <Search className="pointer-events-none absolute top-3 left-3 size-5 text-muted" aria-hidden="true" />
+          <Search
+            className="pointer-events-none absolute top-3 left-3 size-5 text-muted"
+            aria-hidden="true"
+          />
           <input
             value={query}
             onChange={(event) => {
@@ -72,26 +76,28 @@ export function Screener({
               setLimit(40);
             }}
             placeholder="BTC, SOL, PEPE…"
-            className="h-11 w-full rounded-lg border border-border bg-bg pr-3 pl-11 text-fg placeholder:text-muted"
+            className="h-12 w-full rounded-xl border border-border bg-bg pr-3 pl-11 text-base text-fg placeholder:text-muted"
           />
         </label>
-        <div className="flex flex-wrap gap-2">
-          {SORTS.map((item) => (
-            <Button
-              key={item.id}
-              variant={sort === item.id ? "primary" : "ghost"}
-              className="px-3"
-              onClick={() => {
-                setSort(item.id);
-                setLimit(40);
-              }}
-            >
-              {item.label}
-            </Button>
-          ))}
+        <div className="min-w-0 overflow-x-auto">
+          <div className="flex w-max gap-2 pb-1">
+            {SORTS.map((item) => (
+              <Button
+                key={item.id}
+                variant={sort === item.id ? "primary" : "ghost"}
+                className="shrink-0 px-3 whitespace-nowrap"
+                onClick={() => {
+                  setSort(item.id);
+                  setLimit(40);
+                }}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
-      <ul className="max-h-[36rem] overflow-y-auto">
+      <ul className="lg:max-h-[36rem] lg:overflow-y-auto">
         {visible.length === 0 ? (
           <li className="px-4 py-8 text-sm text-muted">Aucune paire ne correspond.</li>
         ) : (
@@ -101,8 +107,10 @@ export function Screener({
                 type="button"
                 onClick={() => onPick(row.symbol)}
                 className={cn(
-                  "flex min-h-14 w-full items-center gap-3 border-b border-border px-4 py-3 text-left",
-                  row.symbol === selected ? "bg-surface-2" : "hover:bg-bg",
+                  "flex min-h-16 w-full items-center gap-3 border-b border-border px-4 py-3 text-left",
+                  row.symbol === selected
+                    ? "bg-surface-2 shadow-[inset_3px_0_0_var(--color-brass)]"
+                    : "hover:bg-bg",
                 )}
               >
                 <CoinLogo base={row.base} size="sm" />
@@ -111,7 +119,10 @@ export function Screener({
                     <span className="font-medium text-fg">{row.base}</span>
                     <BiasPill bias={row.bias} />
                     {watched.has(row.symbol) ? (
-                      <span className="size-1.5 rounded-full bg-brass" aria-label="Veille enregistrée" />
+                      <span
+                        className="size-1.5 rounded-full bg-brass"
+                        aria-label="Veille enregistrée"
+                      />
                     ) : null}
                   </span>
                   <span className="mt-1 flex items-center gap-2 text-xs text-muted">
@@ -120,8 +131,15 @@ export function Screener({
                   </span>
                 </span>
                 <span className="text-right">
-                  <span className="block font-medium text-fg tabular-nums">{formatPrice(row.price)}</span>
-                  <span className={cn("text-sm tabular-nums", row.changePct >= 0 ? "text-up" : "text-down")}>
+                  <span className="block text-base font-medium text-fg tabular-nums">
+                    {formatPrice(row.price)}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm tabular-nums",
+                      row.changePct >= 0 ? "text-up" : "text-down",
+                    )}
+                  >
                     {formatPct(row.changePct)}
                   </span>
                 </span>
@@ -160,7 +178,10 @@ function RangeMark({ pos }: { pos: number }) {
   const left = Math.min(100, Math.max(0, pos * 100));
   return (
     <span className="relative inline-block h-1 w-12 rounded-full bg-bg" aria-hidden="true">
-      <span className="absolute top-[-2px] size-2 rounded-full bg-brass" style={{ left: `${left}%` }} />
+      <span
+        className="absolute top-[-2px] size-2 rounded-full bg-brass"
+        style={{ left: `${left}%` }}
+      />
     </span>
   );
 }
