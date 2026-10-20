@@ -9,7 +9,7 @@ export function PlanStrip({ verdict, price }: { verdict: Verdict; price: number 
   const stop = movePrice(price, SUGGESTED_STOP_PCT);
   const win = movePrice(price, SUGGESTED_TAKE_PCT);
   const whenClass =
-    verdict === "prends" ? "text-up" : verdict === "laisse" ? "text-down" : "text-brass";
+    verdict === "ouvert" ? "text-up" : verdict === "ecarte" ? "text-down" : "text-brass";
 
   return (
     <div>
@@ -17,7 +17,7 @@ export function PlanStrip({ verdict, price }: { verdict: Verdict; price: number 
         <article className="min-w-0 rounded-xl bg-surface-2 px-2.5 py-3">
           <p className="flex items-center gap-1.5 text-[11px] tracking-wide text-brass uppercase">
             <Clock className="size-3.5 shrink-0" aria-hidden="true" />
-            Quand
+            Lecture
           </p>
           <p className={cn("mt-1 text-base leading-tight font-medium", whenClass)}>
             {WHEN_LABEL[verdict]}
@@ -45,8 +45,10 @@ export function PlanStrip({ verdict, price }: { verdict: Verdict; price: number 
         </article>
       </div>
       <p className="mt-2 text-sm text-muted">
-        {formatPct(SUGGESTED_TAKE_PCT)} de gain contre {formatPct(SUGGESTED_STOP_PCT)} de stop. Tu
-        risques 1 pour viser {formatRatio(SUGGESTED_TAKE_PCT, Math.abs(SUGGESTED_STOP_PCT))}.
+        Repère fixe : {formatPct(SUGGESTED_TAKE_PCT)} au-dessus du cours,{" "}
+        {formatPct(SUGGESTED_STOP_PCT)} en dessous, soit environ{" "}
+        {formatRatio(SUGGESTED_TAKE_PCT, Math.abs(SUGGESTED_STOP_PCT))} pour 1. Illustration, pas un
+        objectif personnel.
       </p>
     </div>
   );

@@ -104,7 +104,7 @@ export function watchError(
     return "Indiquez un stop et un gain d’arrêt, avec un point ou une virgule.";
   }
   if (!(stop < price && price < take)) {
-    return "Position longue : le stop doit être sous le cours, le gain au-dessus.";
+    return "Le niveau bas doit rester sous le cours, et le niveau haut au-dessus.";
   }
   return null;
 }

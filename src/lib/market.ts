@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { displayName, nameOf } from "@/lib/coin-names";
 import { baseOf, decodeEntities, finiteNumber, mapRows, readTicker } from "@/lib/market-parse";
 
 export type Bias = "hausse" | "baisse" | "range";
@@ -85,48 +86,6 @@ export type Intel = {
   updatedAt: number;
 };
 
-const NAMES: Record<string, string> = {
-  BTC: "Bitcoin",
-  ETH: "Ethereum",
-  BNB: "BNB",
-  SOL: "Solana",
-  XRP: "XRP",
-  ZEC: "Zcash",
-  DOGE: "Dogecoin",
-  ADA: "Cardano",
-  AVAX: "Avalanche",
-  DOT: "Polkadot",
-  LINK: "Chainlink",
-  TRX: "TRON",
-  TON: "Toncoin",
-  SHIB: "Shiba Inu",
-  LTC: "Litecoin",
-  BCH: "Bitcoin Cash",
-  UNI: "Uniswap",
-  ATOM: "Cosmos",
-  NEAR: "NEAR",
-  APT: "Aptos",
-  SUI: "Sui",
-  PEPE: "Pepe",
-  TAO: "Bittensor",
-  INJ: "Injective",
-  FIL: "Filecoin",
-  OP: "Optimism",
-  ARB: "Arbitrum",
-  POL: "Polygon",
-  HBAR: "Hedera",
-  ICP: "Internet Computer",
-  ETC: "Ethereum Classic",
-  XLM: "Stellar",
-  AAVE: "Aave",
-  WIF: "dogwifhat",
-  BONK: "Bonk",
-  SEI: "Sei",
-  TIA: "Celestia",
-  WLD: "Worldcoin",
-  FET: "Artificial Superintelligence Alliance",
-};
-
 const FNG_FR: Record<string, string> = {
   "Extreme Fear": "Peur extrême",
   Fear: "Peur",
@@ -135,6 +94,7 @@ const FNG_FR: Record<string, string> = {
   "Extreme Greed": "Avidité extrême",
 };
 
+// Public market-data hosts. The interface must not link to a trading venue.
 const HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"];
 
 type CacheEntry<T> = { at: number; value: T };
@@ -164,8 +124,8 @@ const FRESH_QUOTE_MS = 3_000;
 const FRESH_DETAIL_MS = 30_000;
 const KEPT_MS = 5 * 60_000;
 
-async function binance(path: string, ms: number): Promise<unknown> {
-  let last = "Binance est injoignable pour le moment.";
+async function fetchMarketJson(path: string, ms: number): Promise<unknown> {
+  let last = "Les données de marché sont injoignables pour le moment.";
   for (const host of HOSTS) {
     try {
       const res = await fetch(host + path, {
@@ -173,12 +133,12 @@ async function binance(path: string, ms: number): Promise<unknown> {
         headers: { accept: "application/json" },
       });
       if (!res.ok) {
-        last = `Binance a répondu ${res.status}.`;
+        last = `La source de marché a répondu ${res.status}.`;
         continue;
       }
       return await res.json();
     } catch {
-      last = "Binance est injoignable pour le moment.";
+      last = "Les données de marché sont injoignables pour le moment.";
     }
   }
   throw new Error(last);
@@ -319,9 +279,12 @@ async function loadMarket(): Promise<MarketOk> {
   const cached = fromCache<MarketOk>("market", FRESH_MARKET_MS);
   if (cached) return cached;
   try {
-    const [ticker, fng] = await Promise.all([binance("/api/v3/ticker/24hr", 15_000), loadFear()]);
+    const [ticker, fng] = await Promise.all([
+      fetchMarketJson("/api/v3/ticker/24hr", 15_000),
+      loadFear(),
+    ]);
     const rows = mapRows(ticker);
-    if (rows.length === 0) throw new Error("Aucune paire USDT reçue de Binance.");
+    if (rows.length === 0) throw new Error("Aucune paire USDT reçue.");
     const bases = new Set(rows.map((row) => row.base));
     const trending = await loadTrending(bases);
     const value: MarketOk = { ok: true, updatedAt: Date.now(), rows, fng, trending };
@@ -339,7 +302,7 @@ async function loadQuote(symbol: string): Promise<Quote> {
   const cached = fromCache<Quote>(key, FRESH_QUOTE_MS);
   if (cached?.ok) return cached;
   try {
-    const payload = await binance(`/api/v3/ticker/24hr?symbol=${symbol}`, 8_000);
+    const payload = await fetchMarketJson(`/api/v3/ticker/24hr?symbol=${symbol}`, 8_000);
     const quote = readTicker(payload, symbol);
     if (quote.ok) putCache(key, quote);
     return quote;
@@ -356,7 +319,7 @@ async function loadDetail(symbol: string): Promise<Detail> {
   if (cached?.ok) return cached;
   let payload: unknown;
   try {
-    payload = await binance(`/api/v3/klines?symbol=${symbol}&interval=1h&limit=80`, 8_000);
+    payload = await fetchMarketJson(`/api/v3/klines?symbol=${symbol}&interval=1h&limit=80`, 8_000);
   } catch (error) {
     const stale = fromCache<Detail>(key, KEPT_MS);
     if (stale?.ok) return stale;
@@ -498,7 +461,7 @@ async function loadIntel(symbol: string): Promise<Intel> {
   const cached = fromCache<Intel>(key, 60_000);
   if (cached) return cached;
   const base = baseOf(symbol);
-  const name = NAMES[base];
+  const name = nameOf(base);
   const query = name ? `"${name}" crypto` : `${base} crypto`;
   const notes: string[] = [];
   const [general, google, bluesky, stock] = await Promise.all([
@@ -546,7 +509,7 @@ export const getMarket = createServerFn({ method: "GET" }).handler(
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : "Impossible de lire Binance.",
+        error: error instanceof Error ? error.message : "Impossible de lire les données de marché.",
       };
     }
   },
@@ -587,6 +550,4 @@ export const getIntel = createServerFn({ method: "GET" })
   .validator(symbolValidator)
   .handler(async ({ data }): Promise<Intel> => loadIntel(data.symbol));
 
-export function displayName(base: string): string {
-  return NAMES[base] ?? base;
-}
+export { displayName };

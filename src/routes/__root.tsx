@@ -16,7 +16,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Veille des paires USDT Binance : cours réels, actus et réseaux, stop loss et gain d’arrêt.",
+          "Information générale sur des paires spot en USDT : filtre automatique, actus et veille de cours. Pas un conseil en investissement.",
       },
       { name: "theme-color", content: "#0e1210" },
     ],

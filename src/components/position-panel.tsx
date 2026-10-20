@@ -159,13 +159,14 @@ export function PositionPanel({
         <div>
           <h3 className="font-medium text-fg">Stop loss et gain</h3>
           <p className="text-sm text-muted">
-            Le stop coupe la perte. Le gain prend le bénéfice. Aucun ordre n’est envoyé à Binance.
+            Ces niveaux restent sur cet appareil. Aucun ordre n’est transmis : une alerte s’affiche
+            seulement si le cours les touche.
           </p>
         </div>
         <Field
           id="stop"
           label="Stop loss"
-          hint="Si le cours tombe ici, tu sors."
+          hint="Niveau sous le cours. Une alerte s’affiche s’il est touché."
           value={stopText}
           onChange={setStopText}
           tone="down"
@@ -179,7 +180,7 @@ export function PositionPanel({
         <Field
           id="take"
           label="Gain"
-          hint="Si le cours monte ici, tu prends le bénéfice."
+          hint="Niveau au-dessus du cours. Une alerte s’affiche s’il est touché."
           value={takeText}
           onChange={setTakeText}
           tone="up"
@@ -225,6 +226,7 @@ export function PositionPanel({
       <Chart detail={detail} error={detailError} />
       {call ? <PlanStrip verdict={call.verdict} price={price ?? call.price} /> : null}
       {call ? <p className="text-sm leading-relaxed text-muted">{call.why}</p> : null}
+      {call ? <p className="text-sm leading-relaxed text-muted">{call.note}</p> : null}
     </section>
   );
 }
