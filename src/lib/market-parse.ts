@@ -46,7 +46,7 @@ export function decodeEntities(raw: string): string {
 }
 
 export function mapRows(payload: unknown): MarketRow[] {
-  if (!Array.isArray(payload)) throw new Error("Réponse Binance inattendue.");
+  if (!Array.isArray(payload)) throw new Error("Réponse de marché inattendue.");
   const rows: MarketRow[] = [];
   for (const item of payload) {
     if (!item || typeof item !== "object") continue;
@@ -87,7 +87,7 @@ export function readTicker(payload: unknown, symbol: string, at = Date.now()): Q
   }
   const raw = payload as Record<string, unknown>;
   if (typeof raw.code === "number") {
-    return { ok: false, error: "Cette paire n’est pas cotée en spot USDT sur Binance." };
+    return { ok: false, error: "Cette paire n’est pas disponible dans les données de marché." };
   }
   const price = finiteNumber(raw.lastPrice);
   if (!(price > 0)) return { ok: false, error: "Cours indisponible." };

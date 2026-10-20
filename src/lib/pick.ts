@@ -1,7 +1,8 @@
-import { displayName, type MarketRow } from "@/lib/market";
-import { formatPct } from "@/lib/format";
+import { displayName } from "./coin-names.ts";
+import { formatPct } from "./format.ts";
+import type { MarketRow } from "./market.ts";
 
-export type Verdict = "prends" | "attends" | "laisse";
+export type Verdict = "ouvert" | "neutre" | "ecarte";
 
 export type Call = {
   symbol: string;
@@ -9,10 +10,9 @@ export type Call = {
   name: string;
   price: number;
   changePct: number;
-  confidence: number;
   verdict: Verdict;
   why: string;
-  advice: string;
+  note: string;
 };
 
 const STABLES = new Set([
@@ -46,10 +46,10 @@ function isStable(row: MarketRow): boolean {
 }
 
 function verdictOf(row: MarketRow): Verdict {
-  if (row.changePct >= 12 || (row.changePct >= 8 && row.rangePos > 0.88)) return "laisse";
-  if (row.changePct <= -6 || row.rangePos < 0.22) return "attends";
-  if (row.changePct >= -2.5 && row.changePct <= 7 && row.rangePos <= 0.86) return "prends";
-  return "attends";
+  if (row.changePct >= 12 || (row.changePct >= 8 && row.rangePos > 0.88)) return "ecarte";
+  if (row.changePct <= -6 || row.rangePos < 0.22) return "neutre";
+  if (row.changePct >= -2.5 && row.changePct <= 7 && row.rangePos <= 0.86) return "ouvert";
+  return "neutre";
 }
 
 function scoreOf(row: MarketRow, verdict: Verdict): number {
@@ -62,60 +62,57 @@ function scoreOf(row: MarketRow, verdict: Verdict): number {
   let place = 10;
   if (row.rangePos >= 0.4 && row.rangePos <= 0.78) place = 25;
   else if (row.rangePos > 0.86) place = 6;
-  const bias = verdict === "prends" ? 10 : verdict === "laisse" ? -18 : 0;
+  const bias = verdict === "ouvert" ? 10 : verdict === "ecarte" ? -18 : 0;
   return volume + momentum + place + bias;
-}
-
-function confidenceOf(score: number): number {
-  return Math.max(48, Math.min(84, Math.round(40 + score * 0.5)));
 }
 
 function whyFor(row: MarketRow, verdict: Verdict): string {
   const name = displayName(row.base);
   const move = formatPct(row.changePct);
-  if (verdict === "laisse") {
-    return `${name} a déjà fait ${move} aujourd’hui. Le mouvement est parti, c’est trop tard pour courir après.`;
+  if (verdict === "ecarte") {
+    return `${name} a varié de ${move} sur 24 h. Le mouvement est déjà large, ou le cours est proche du plus haut de la séance. Le filtre écarte cette lecture.`;
   }
-  if (verdict === "attends") {
+  if (verdict === "neutre") {
     return row.changePct < 0
-      ? `${name} recule (${move}) et le cours n’a pas encore calmé. Pas le moment de forcer.`
-      : `${name} bouge de ${move}, sans direction nette. Rien de clair pour entrer.`;
+      ? `${name} recule (${move}) et le cours reste dans le bas de la séance. Le filtre ne retient pas de lecture ouverte.`
+      : `${name} bouge de ${move}, sans direction nette sur la séance. Le filtre reste neutre.`;
   }
   if (row.changePct >= 0) {
-    return `${name} avance de ${move}, avec assez d’échanges, et elle n’est pas collée au plus haut du jour.`;
+    return `${name} avance de ${move} sur 24 h. Les échanges sont fournis, et le cours n’est pas collé au plus haut de la séance.`;
   }
-  return `${name} cède un peu (${move}), mais le volume tient et la baisse n’est pas violente.`;
+  return `${name} cède un peu (${move}). Le volume reste présent et la baisse de la séance n’est pas extrême.`;
 }
 
-function adviceFor(verdict: Verdict): string {
-  if (verdict === "prends") {
-    return "Suis-la en position longue. Stop à −5 % du cours, gain à +6 %. Si ça s’emballe, tu n’en rajoutes pas.";
+function noteFor(verdict: Verdict): string {
+  if (verdict === "ouvert") {
+    return "Repère fixe, le même pour chaque paire : −5 % sous le cours et +6 % au-dessus. Illustration du filtre, pas une indication d’intervenir.";
   }
-  if (verdict === "laisse") {
-    return "Passe ton tour. Acheter le haut, c’est le plus court chemin vers le stop.";
+  if (verdict === "ecarte") {
+    return "Aucune action n’est indiquée. Le repère −5 % / +6 % peut rester affiché à titre de comparaison, sans valoir invitation.";
   }
-  return "Tu ne fais rien. Tu attends que le cours se pose, et seulement après tu poses un stop.";
+  return "Le filtre ne dégage pas de lecture ouverte. Le repère −5 % / +6 % est un calque fixe, pas une invitation à intervenir.";
 }
 
 export function callFor(row: MarketRow): Call {
   const verdict = verdictOf(row);
-  const score = scoreOf(row, verdict);
   return {
     symbol: row.symbol,
     base: row.base,
     name: displayName(row.base),
     price: row.price,
     changePct: row.changePct,
-    confidence: confidenceOf(score),
     verdict,
     why: whyFor(row, verdict),
-    advice: adviceFor(verdict),
+    note: noteFor(verdict),
   };
 }
 
 export function bestCall(rows: MarketRow[]): Call | null {
-  const pool = rows.filter((row) => !isStable(row) && row.quoteVolume >= 8_000_000 && row.price > 0);
-  const usable = pool.length >= 5 ? pool : rows.filter((row) => !isStable(row) && row.quoteVolume >= 1_000_000);
+  const pool = rows.filter(
+    (row) => !isStable(row) && row.quoteVolume >= 8_000_000 && row.price > 0,
+  );
+  const usable =
+    pool.length >= 5 ? pool : rows.filter((row) => !isStable(row) && row.quoteVolume >= 1_000_000);
   if (usable.length === 0) return null;
   let best: { row: MarketRow; score: number } | null = null;
   for (const row of usable) {
@@ -127,7 +124,7 @@ export function bestCall(rows: MarketRow[]): Call | null {
 }
 
 export const WHEN_LABEL: Record<Verdict, string> = {
-  prends: "Maintenant",
-  attends: "Pas encore",
-  laisse: "Ne pas entrer",
+  ouvert: "Ouverte",
+  neutre: "Neutre",
+  ecarte: "Écartée",
 };

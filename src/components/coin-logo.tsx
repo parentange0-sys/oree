@@ -20,7 +20,6 @@ export function CoinLogo({
   useEffect(() => setStep(0), [base]);
 
   const sources = [
-    `https://bin.bnbstatic.com/static/assets/logos/${encodeURIComponent(base)}.png`,
     `https://assets.coincap.io/assets/icons/${encodeURIComponent(base.toLowerCase())}@2x.png`,
   ];
   const src = step < sources.length ? sources[step] : null;

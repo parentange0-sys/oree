@@ -18,16 +18,10 @@ export function PickCard({
       <div className="flex items-center gap-3">
         <CoinLogo base={call.base} size="lg" priority />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-[0.16em] text-brass uppercase">La crypto</p>
+          <p className="text-[11px] tracking-[0.16em] text-brass uppercase">Filtre</p>
           <h2 className="truncate text-2xl font-medium text-fg">{call.base}</h2>
           <p className="truncate text-sm text-muted">{call.name}</p>
         </div>
-        <p className="text-right">
-          <span className="block text-lg font-medium text-fg tabular-nums">
-            {call.confidence} %
-          </span>
-          <span className="text-xs text-muted">confiance</span>
-        </p>
       </div>
 
       <p className="mt-4 flex flex-wrap items-baseline gap-x-2 font-serif text-[2.6rem] leading-none tracking-tight text-fg tabular-nums">
@@ -48,13 +42,13 @@ export function PickCard({
         <PlanStrip verdict={call.verdict} price={call.price} />
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">{call.why}</p>
-      <p className="mt-2 text-sm leading-relaxed text-fg">{call.advice}</p>
+      <p className="mt-2 text-sm leading-relaxed text-muted">{call.note}</p>
       <Button
         className="mt-4 w-full sm:w-auto"
         variant="primary"
         onClick={() => onOpen(call.symbol)}
       >
-        {selected ? `C’est ${call.base}` : `Ouvrir ${call.base}`}
+        {selected ? `Détail de ${call.base}` : `Voir ${call.base}`}
       </Button>
     </section>
   );

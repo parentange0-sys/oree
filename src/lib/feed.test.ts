@@ -108,8 +108,10 @@ describe("feedStatus", () => {
 describe("unwrapOk", () => {
   it("garde le succès et lève l’erreur métier", () => {
     assert.deepEqual(unwrapOk({ ok: true, price: 1 }), { ok: true, price: 1 });
-    assert.throws(() => unwrapOk({ ok: false, error: "Binance est injoignable pour le moment." }), {
-      message: "Binance est injoignable pour le moment.",
-    });
+    assert.throws(
+      () =>
+        unwrapOk({ ok: false, error: "Les données de marché sont injoignables pour le moment." }),
+      { message: "Les données de marché sont injoignables pour le moment." },
+    );
   });
 });

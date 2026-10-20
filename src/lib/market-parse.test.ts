@@ -119,7 +119,7 @@ describe("readTicker", () => {
     const missing = readTicker({ code: -1121, msg: "Invalid symbol." }, "NOPEUSDT", 1);
     assert.deepEqual(missing, {
       ok: false,
-      error: "Cette paire n’est pas cotée en spot USDT sur Binance.",
+      error: "Cette paire n’est pas disponible dans les données de marché.",
     });
     assert.equal(readTicker([], "BTCUSDT").ok, false);
     assert.equal(readTicker({ lastPrice: "0" }, "BTCUSDT").ok, false);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { getDetail, getIntel, getMarket, getQuote } from "@/lib/market";
 import { formatPrice, formatQuote, formatTime } from "@/lib/format";
 import { feedLabel, feedStatus, unwrapOk, type FeedStatus } from "@/lib/feed";
@@ -21,6 +21,7 @@ import { bestCall } from "@/lib/pick";
 import { PickCard } from "@/components/pick-card";
 import { IntelPanel } from "@/components/intel-panel";
 import { CoinLogo } from "@/components/coin-logo";
+import { RiskNotice } from "@/components/risk-notice";
 
 type Tab = "marche" | "position" | "infos";
 
@@ -170,9 +171,28 @@ export function MarketApp({ symbol }: { symbol: string }) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] tracking-[0.16em] text-brass uppercase">Veille spot</p>
+            <p className="text-[11px] tracking-[0.16em] text-brass uppercase">Veille de marché</p>
             <h1 className="font-serif text-3xl leading-none text-fg italic">Orée</h1>
-            <p className="mt-1 text-sm text-muted">Quand investir, le stop loss, et le gain.</p>
+            <p className="mt-1 text-sm text-muted">
+              Filtre automatique, repères illustratifs, actus.
+            </p>
+            <p className="mt-2 text-xs">
+              <Link
+                to="/mentions-legales"
+                className="text-fg underline decoration-border underline-offset-2"
+              >
+                Mentions légales
+              </Link>
+              <span className="mx-2 text-border" aria-hidden="true">
+                ·
+              </span>
+              <Link
+                to="/confidentialite"
+                className="text-fg underline decoration-border underline-offset-2"
+              >
+                Confidentialité
+              </Link>
+            </p>
           </div>
           <StatusPill status={status} at={stampedAt} />
         </div>
@@ -182,6 +202,10 @@ export function MarketApp({ symbol }: { symbol: string }) {
           </p>
         ) : null}
       </header>
+
+      <div className="mb-4">
+        <RiskNotice />
+      </div>
 
       {level.hit && price != null ? (
         <div
@@ -210,17 +234,17 @@ export function MarketApp({ symbol }: { symbol: string }) {
         <div aria-busy="true" className="flex flex-col gap-3">
           <div className="oree-skeleton h-64 rounded-2xl" />
           <div className="oree-skeleton h-24 rounded-2xl" />
-          <p className="text-sm text-muted">Ouverture des cours Binance…</p>
+          <p className="text-sm text-muted">Ouverture des cours…</p>
         </div>
       ) : !snapshot ? (
         <div className="rounded-2xl border border-border bg-surface p-4">
           <p className="text-lg text-fg">
-            {online ? "Les cours Binance ne répondent pas." : "Hors ligne."}
+            {online ? "Les cours ne répondent pas." : "Hors ligne."}
           </p>
           <p className="mt-1 text-sm text-muted">
             {online
               ? errorText(market.error)
-              : "Les cours reviendront avec le réseau. Rien n’est envoyé à Binance."}
+              : "Les cours reviendront avec le réseau. Aucun ordre n’est transmis."}
           </p>
           <Button className="mt-4" variant="primary" onClick={() => void market.refetch()}>
             Réessayer
@@ -319,8 +343,9 @@ export function MarketApp({ symbol }: { symbol: string }) {
 
       <footer className="mt-6 pb-2 text-xs leading-relaxed text-muted">
         <p>
-          Cours : API publique Binance, spot USDT. Le stop et le gain restent sur cet appareil et ne
-          passent aucun ordre. Lecture automatique, pas un conseil en investissement.
+          Données de marché, paires spot en USDT. Les niveaux de veille restent sur cet appareil et
+          ne transmettent aucun ordre. Lecture automatique d’un filtre fixe : information générale,
+          pas un conseil en investissement.
         </p>
         <p className="mt-2">
           <a
@@ -375,7 +400,7 @@ function StatusPill({ status, at }: { status: FeedStatus; at: number | null }) {
 
 function errorText(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return "Impossible de lire Binance.";
+  return "Impossible de lire les données de marché.";
 }
 
 function chime(kind: HitKind) {
